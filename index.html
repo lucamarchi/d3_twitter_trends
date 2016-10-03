@@ -1,0 +1,292 @@
+<!doctype html>
+
+<title>Socket.io Demo</title>
+
+<div id="tweets"></div>
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<body>
+<script>
+
+    var socket = io.connect();
+    var identIncr = 0;
+    var rectArray = [];
+    var textArray = [];
+    var groupText = [];
+    var totalTweet = 0;
+    var initYText = 85;
+    var initXRect = 10;
+    var initYRect = 50;
+    var initFirstLine = 50;
+    var start = false;
+    var sec = 0;
+
+    var svg = d3.select("body").append("svg")
+        .attr("width", 1200)
+        .attr("height", 1800);
+
+    var groupArray = [];
+
+    var rect = svg.append("rect")
+        .attr("x", 10)
+        .attr("y", 10)
+        .attr("width", 650)
+        .attr("height", 40)
+        .attr("fill", "none")
+        .attr("stroke", "black");
+
+    var lineFirst = svg.append("line")
+        .attr("x1", 420)
+        .attr("y1", 10)
+        .attr("x2", 420)
+        .attr("y2", 50)
+        .attr("stroke", "black");
+
+    var lineSecond = svg.append("line")
+        .attr("x1", 530)
+        .attr("y1", 10)
+        .attr("x2", 530)
+        .attr("y2", 50)
+        .attr("stroke", "black");
+
+    var textHashtag = svg.append("text")
+        .attr("x", 70)
+        .attr("y", 35)
+        .text("#HASHTAG")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "18px")
+        .style("font-weight", "bold")
+        .style("text-decoration", "underline");
+
+    var textCount = svg.append("text")
+        .attr("x", 430)
+        .attr("y", 35)
+        .text("COUNT")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "18px")
+        .style("font-weight", "bold")
+        .style("text-decoration", "underline");
+
+    var textFreq = svg.append("text")
+        .attr("x", 550)
+        .attr("y", 35)
+        .text("%")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "18px")
+        .style("font-weight", "bold")
+        .style("text-decoration", "underline");
+
+    var textTotal = svg.append("text")
+        .attr("x", 700)
+        .attr("y", 35)
+        .text("Total Tweet 0")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "18px");
+
+    var clock = svg.append("text")
+        .attr("x", 850)
+        .attr("y", 35)
+        .text("from 0 sec")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "18px");
+
+    function checkValue(name) {
+        for (var i=0; i<groupArray.length; i++) {
+            if (groupArray[i][0][0].childNodes[1].textContent === name) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    setInterval(function() {
+        if (start) {
+            sec++;
+            clock[0][0].textContent = "from "+sec+" sec";
+        }
+    }, 1000);
+
+    socket.on('message', function (data) {
+        start = true;
+        var check = checkValue(data.name);
+        totalTweet++;
+        updateTotalTweet();
+        if (check === -1) {
+            createNewRow(data.name,identIncr);
+        }
+        else {
+            updateRow(data.name,check);
+        }
+    });
+
+
+    function createNewRow(hashtag,num) {
+
+        updateAllExceptInput(hashtag);
+        
+        var group = svg.append("g");
+
+        var rect = group.append("rect")
+            .attr("x", initXRect)
+            .attr("y", initYRect)
+            .attr("height", 40)
+            .attr("width", 650)
+            .attr("fill", "none")
+            .attr("stroke", "black");
+
+        var lineFirst = svg.append("line")
+            .attr("x1", 420)
+            .attr("y1", initFirstLine)
+            .attr("x2", 420)
+            .attr("y2", initFirstLine+40)
+            .attr("stroke", "black");
+
+        var lineSecond = svg.append("line")
+            .attr("x1", 530)
+            .attr("y1", initFirstLine)
+            .attr("x2", 530)
+            .attr("y2", initFirstLine+40)
+            .attr("stroke", "black");
+
+        var font_dim = "18px";
+        if (hashtag.length >= 35) {
+            font_dim = "12px";
+        }
+
+        var word = hashtag.split("#")[1];
+
+        var textHashtag = group.append("text")
+            .attr("x", 70)
+            .attr("y", initYRect+25)
+            .text(hashtag)
+            .attr("fill", "#3BA9EE")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", font_dim);
+
+        var textCount = group.append("text")
+            .attr("x", 430)
+            .attr("y", initYRect+25)
+            .text("1")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "18px");
+
+        var freq = (100/totalTweet).toString().substring(0,5);
+
+        var textFreq = group.append("text")
+            .attr("x", 550)
+            .attr("y", initYRect+25)
+            .text(freq)
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "18px");
+
+        var prp = calculateProportion(1);
+
+        var rectCompare = group.append("rect")
+            .attr("x", 10)
+            .attr("y", initYRect+35)
+            .attr("height", 5)
+            .attr("width", prp)
+            .style("fill", function() { return colores_google(num); })
+            .attr("stroke", "black");
+
+        initYText += 40;
+        initYRect += 40;
+        initFirstLine += 40;
+        groupArray.push(group);
+        sendBallToRow(initYRect-18,num);
+    }
+
+    function updateRow(hashtag,ind) {
+        updateAllExceptInput(hashtag);
+        var newCount = parseInt(groupArray[ind][0][0].childNodes[2].textContent)+1;
+        groupArray[ind][0][0].childNodes[2].textContent = newCount;
+        var prp = ((newCount*100)/totalTweet).toString().substring(0,5);
+        groupArray[ind][0][0].childNodes[3].textContent = prp;
+        var cy = groupArray[ind][0][0].childNodes[3].attributes[1].nodeValue;
+        sendBallToRow(cy,ind);
+        var prpLength = calculateProportion(newCount);
+        groupArray[ind][0][0].childNodes[4].attributes[3].nodeValue = prpLength;
+        orderAllRow();
+    }
+
+    function updateAllExceptInput(hashtag) {
+        for (var i=0; i<groupArray.length; i++) {
+            if (groupArray[i][0][0].childNodes[1].textContent !== name) {
+                var count = parseInt(groupArray[i][0][0].childNodes[2].textContent);
+                var prp = ((count*100)/totalTweet).toString().substring(0,5);
+                groupArray[i][0][0].childNodes[3].textContent = prp;
+                var prpLength = calculateProportion(count);
+                groupArray[i][0][0].childNodes[4].attributes[3].nodeValue = prpLength;
+            }
+        }
+    }
+
+    function orderAllRow() {
+        var swapped;
+        do {
+            swapped = false;
+            for (var i=0; i<groupArray.length-1; i++) {
+                var j=i+1;
+                if (parseInt(groupArray[i][0][0].childNodes[2].textContent) <  parseInt(groupArray[j][0][0].childNodes[2].textContent)) {
+                    var textI = groupArray[i][0][0].childNodes[1].textContent;
+                    var countI = groupArray[i][0][0].childNodes[2].textContent;
+                    var freqI = groupArray[i][0][0].childNodes[3].textContent;
+                    var rectLen = groupArray[i][0][0].childNodes[4].attributes[3].nodeValue;
+                    groupArray[i][0][0].childNodes[1].textContent = groupArray[j][0][0].childNodes[1].textContent;
+                    groupArray[i][0][0].childNodes[2].textContent = groupArray[j][0][0].childNodes[2].textContent;
+                    groupArray[i][0][0].childNodes[3].textContent = groupArray[j][0][0].childNodes[3].textContent;
+                    groupArray[i][0][0].childNodes[4].attributes[3].nodeValue = groupArray[j][0][0].childNodes[4].attributes[3].nodeValue;
+                    groupArray[j][0][0].childNodes[1].textContent = textI;
+                    groupArray[j][0][0].childNodes[2].textContent = countI;
+                    groupArray[j][0][0].childNodes[3].textContent = freqI;
+                    groupArray[j][0][0].childNodes[4].attributes[3].nodeValue = rectLen;
+                    swapped = true;
+                }
+            }
+        } while (swapped);
+    }
+
+    function updateTotalTweet() {
+        textTotal[0][0].textContent = "Total Tweet: "+totalTweet;
+    }
+
+    function sendBallToRow(cy,i) {
+        var circle = svg.append("circle")
+            .attr("cx", 1500)
+            .attr("cy", cy)
+            .attr("r", 12)
+            .attr("fill", function() { return colores_google(i); })
+            .attr("stroke", "black");
+        circle.transition().duration(800).attr("cx", 668).attr("cy",cy);
+        circle.transition().delay(700).duration(400).style("opacity",0);
+    }
+
+    function getMax() {
+        var max = 0;
+        for (var i=0; i<groupArray.length; i++) {
+            if (parseInt(groupArray[i][0][0].childNodes[2].textContent) >= max) {
+                max = parseInt(groupArray[i][0][0].childNodes[2].textContent);
+            }
+        }
+        return max;
+    }
+
+    function calculateProportion(count) {
+        var prp;
+        var max = getMax();
+        if (max !== 0) {
+            prp = (count*410)/max;
+        } else prp = 410;
+        return prp;
+    }
+
+    function colores_google(n) {
+        var i = Math.abs(n);
+        var colores_g = ["#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00", "#b82e2e", "#316395", "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707", "#651067", "#329262", "#5574a6", "#3b3eac"];
+        return colores_g[i % colores_g.length];
+    }
+
+</script>
+</body>
